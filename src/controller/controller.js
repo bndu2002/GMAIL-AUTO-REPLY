@@ -1,6 +1,6 @@
 const { google } = require('googleapis');
 const Buffer = require('buffer').Buffer;
-const base64url = require('urlsafe-base64');
+
 
 //https://stackoverflow.com/questions/246801/how-can-you-encode-a-string-to-base64-in-javascript
 //https://developers.google.com/gmail/api/quickstart/nodejs
@@ -136,6 +136,7 @@ const mailDetails = async (req, res) => {
 
         //const encodedMessage = base64url.encode(payload);
         const repliedThreads = [];
+        //loop to get the details of all messages
         for (let message of messages) {
             let messageInfo = await gmail.users.messages.get({
                 userId: "me",
@@ -144,6 +145,7 @@ const mailDetails = async (req, res) => {
             })
             console.log("message ingo as follows", messageInfo.data.threadId)
 
+            //messageInfor.data.payload.headers
             // message ingo as follows [
             //     { name: 'Delivered-To', value: 'bndusharma2002@gmail.com' },
             //     {
@@ -236,10 +238,13 @@ const mailDetails = async (req, res) => {
             let threadId = messageInfo.data.threadId;
             let sender = null;
             let sendEmailFrom = null
+            //loop to get essential details from headers of a message and send response
             for (let header of headers) {
 
                 if (header.name === "From") {
                     let email = null
+
+                    //getting email like this <email id goes here> hence regex
                     const matches = header.value.match(/\<([^>]+)\>/);
                     if (matches) {
                         email = matches[1];
@@ -248,6 +253,7 @@ const mailDetails = async (req, res) => {
                         email = header.value
                     }
 
+                    //exclude email that contains : no reply , domain other than @gmail
                     if (/^\S+@\S+\.\S+$/.test(email) && !/no ?reply/i.test(email) && email.endsWith('@gmail.com')) {
                         sender = email;
                     } else {
@@ -257,10 +263,8 @@ const mailDetails = async (req, res) => {
                 else if (header.name === "Delivered-To") {
                     sendEmailFrom = header.value
                 }
-
+                //have threadid and sender + mail not sent already to threadId 
                 if (threadId && sender && !repliedThreads.includes(threadId)) {
-                    //const toEmail = "recipient@example.com";
-
                     const message = [
                         `From: ${sendEmailFrom}`,
                         `To: ${sender}`,
@@ -268,25 +272,6 @@ const mailDetails = async (req, res) => {
                         '',
                         `${body}`
                     ];
-
-
-                    //onst boundary = 'boundary123';
-
-                    // send a reply
-                    // const response = await gmail.users.messages.send({
-                    //     userId: "me",
-                    //     requestBody: {
-                    //         threadId: threadId,
-                    //         message: message
-                    //     },
-                    // });
-
-                    // const encodedMessage = Buffer.from(JSON.stringify(message)).toString("base64")
-                    //     .replace(/\+/g, "-")
-                    //     .replace(/\//g, "_")
-                    //     .replace(/=+$/, "");
-
-                    //const encodedMessage = Buffer.from(JSON.stringify(message)).toString('base64');;
                     try {
                         const response = await gmail.users.messages.send({
                             userId: "me",
@@ -300,18 +285,6 @@ const mailDetails = async (req, res) => {
                             },
                         });
 
-                        // get the message ID from the response
-                        const messageId = response.data.id;
-
-                        // remove the SENT label and add the custom label to the sent message
-                        const modifyResponse = await gmail.users.messages.modify({
-                            userId: 'me',
-                            id: messageId,
-                            requestBody: {
-                                removeLabelIds: ['SENT'],
-                                addLabelIds: [labelId],
-                            },
-                        });
                         console.log("here is the sent response", response);
                     } catch (error) {
                         console.error("Error sending message:", error);
@@ -322,7 +295,7 @@ const mailDetails = async (req, res) => {
                     } else {
                         console.log("Error sending message!");
                     }
-                    // add thread ID to repliedThreads array
+                    // add thread ID to repliedThreads array, keep track of email threads to which mail has been sent already
                     repliedThreads.push(threadId);
                 }
 
