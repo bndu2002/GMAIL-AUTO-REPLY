@@ -1,4 +1,4 @@
-const { google } = require('googleapis');
+
 const axios = require('axios')
 
 
@@ -7,7 +7,7 @@ const getToken = async (req, res, next) => {
 
         const code = req.query.code
 
-        console.log("code is here " , code)
+        console.log("code is here ", code)
 
         // Exchange the authorization code for an access token
         let { data } = await axios({
@@ -30,7 +30,7 @@ const getToken = async (req, res, next) => {
 
         // const response = await axios({
         //     method: 'GET',
-        //     url: 'https://www.googleapis.com/oauth2/v1/userinfo',
+        //     url: 'https://www.googleapis.com/auth/userinfo.profile',
         //     headers: {
         //         Authorization: `Bearer ${access_token}`,
         //     },
@@ -39,7 +39,7 @@ const getToken = async (req, res, next) => {
         // const email = response.data.email;
 
         // req.email = email
-        //console.log('Email:', email);
+        // console.log('Email:', response);
 
 
         req.accessToken = access_token

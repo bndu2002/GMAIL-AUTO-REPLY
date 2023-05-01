@@ -11,7 +11,8 @@ const CLIENT_ID = '739115459157-406g2tg5rumsn2l59cik5ga7n76uk0n7.apps.googleuser
 const CLIENT_SECRET = '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';
 const REDIRECT_URI = 'http://localhost:3001/oauth2callback';
 
-const SCOPES = ['https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send'];
+const SCOPES = ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.send'];
+
 const oauth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 
 const setConnection = async (req, res) => {
@@ -52,7 +53,8 @@ const mailDetails = async (req, res) => {
 
         const response = await gmail.users.messages.list({
             userId: 'me',
-            q: 'in:inbox -from:me -{label:SENT} -{label:CHAT} -{label:DRAFT} -{label:TRASH} -{label:SPAM} -{subject:Re:}'
+            q: 'in:inbox to:me is:unread has:nouserlabels -from:me -{label:SENT} -{label:CHAT} -{label:DRAFT} -{label:TRASH} -{label:SPAM} -{subject:Re:}'
+            //'in:inbox -from:me -{label:SENT} -{label:CHAT} -{label:DRAFT} -{label:TRASH} -{label:SPAM} -{subject:Re:}'
         });
 
         let messages = response.data.messages
@@ -89,11 +91,9 @@ const mailDetails = async (req, res) => {
 
         //console.log("response in your area", response.data.messages)
 
-
-        const subject = "testing gmail app"
         const body = "test email is being sent to you"
 
-        const labelName = 'Test'; // replace this with your label name
+        const labelName = 'Monday'; // replace this with your label name
         let labelId = null;
 
         // Check if label exists
@@ -121,21 +121,7 @@ const mailDetails = async (req, res) => {
             labelId = labelResponse.data.id;
         }
 
-        // Encode message as base64url
-        // const messageParts = [
-        //     "From: sender@example.com",
-        //     "To: recipient@example.com",
-        //     "Subject: Test email",
-        //     "",
-        //     "This is a test email"
-        // ];
-
-
-
-        //console.log(rfc822Message);
-
-        //const encodedMessage = base64url.encode(payload);
-        const repliedThreads = [];
+        const repliedThreads = new Map();
         //loop to get the details of all messages
         for (let message of messages) {
             let messageInfo = await gmail.users.messages.get({
@@ -143,6 +129,7 @@ const mailDetails = async (req, res) => {
                 id: message.id,
                 format: "full",
             })
+            
             console.log("message ingo as follows", messageInfo.data.threadId)
 
             //messageInfor.data.payload.headers
@@ -236,11 +223,18 @@ const mailDetails = async (req, res) => {
 
             let headers = messageInfo.data.payload.headers
             let threadId = messageInfo.data.threadId;
+            let originalSubject = null
             let sender = null;
-            let sendEmailFrom = null
+            let sendEmailFrom = null;
+            let messageId = null;
             //loop to get essential details from headers of a message and send response
             for (let header of headers) {
-
+                if (header.name === "Message-ID") {
+                    messageId = header.value
+                }
+                if (header.name === "Subject") {
+                    originalSubject = header.value
+                }
                 if (header.name === "From") {
                     let email = null
 
@@ -264,11 +258,12 @@ const mailDetails = async (req, res) => {
                     sendEmailFrom = header.value
                 }
                 //have threadid and sender + mail not sent already to threadId 
-                if (threadId && sender && !repliedThreads.includes(threadId)) {
+                if (threadId && messageId && originalSubject && sender && !repliedThreads.has(threadId)) {
                     const message = [
                         `From: ${sendEmailFrom}`,
                         `To: ${sender}`,
-                        `Subject: ${subject}`,
+                        `Subject: Re: ${originalSubject}`,
+                        `In-Reply-To: ${messageId}`,//to maintain the history of messages sent to the thread
                         '',
                         `${body}`
                     ];
@@ -296,7 +291,7 @@ const mailDetails = async (req, res) => {
                         console.log("Error sending message!");
                     }
                     // add thread ID to repliedThreads array, keep track of email threads to which mail has been sent already
-                    repliedThreads.push(threadId);
+                    repliedThreads.set(threadId, 1);
                 }
 
             }
